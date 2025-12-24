@@ -5,6 +5,11 @@ Backend is **FastAPI** (Python) with in-memory storage; frontend is a single **R
 The app includes a task board, progress insights, per-task time estimates, and a polished, mobile-friendly UI.
 
 ---
+## 🚀 Live Demo
+
+**Preview URL:** [https://vibe-taskboard--aaliyahshaikh10.replit.app](https://vibe-taskboard--aaliyahshaikh10.replit.app)
+
+The app is fully deployed and ready to use! Try adding tasks, marking them complete, and watch the insights update.
 
 ## Tech Stack
 
