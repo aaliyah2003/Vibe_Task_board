@@ -146,14 +146,3 @@ All endpoints operate on in-memory data.
 3. **Streak Tracking**: Automatically tracks consecutive days with completed tasks to maintain momentum.
 4. **Smart Suggestions**: Backend suggests the oldest incomplete task to help prioritize work.
 5. **Polished UI**: Gradient background, glassmorphism cards, and responsive design that works on mobile and desktop.
-
----
-
-## Notes for Reviewers
-
-- This repo contains only source code and assets; any prompt history from Cursor is **not** part of the repository.
-- You can inspect the UI by opening `frontend/index.html` with any static server (e.g. `python -m http.server`) even without running the backend, though API-driven features will then return errors.
-- For production, this design would be extended with:
-  - Persistent DB (e.g. Postgres) for users and tasks.
-  - Real auth (hashed passwords, sessions/JWTs).
-  - Real email / notification service for reminders and confirmations.
