@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluid Task Board</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        /* Gradient inspired by provided mock (deep plum to crimson) with layered circles */
+        background:
+          radial-gradient(circle at 15% 20%, rgba(255, 99, 132, 0.32) 0, transparent 30%),
+          radial-gradient(circle at 85% 18%, rgba(96, 12, 78, 0.28) 0, transparent 28%),
+          radial-gradient(circle at 60% 80%, rgba(255, 56, 100, 0.24) 0, transparent 34%),
+          radial-gradient(circle at 25% 70%, rgba(255, 140, 180, 0.18) 0, transparent 35%),
+          radial-gradient(circle at 75% 60%, rgba(120, 60, 200, 0.16) 0, transparent 32%),
+          linear-gradient(135deg, #1a0f2e 0%, #3b0d3a 45%, #700b3d 100%);
+      }
+      .glass {
+        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .glow {
+        box-shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
+      }
+      .animate-shake {
+        animation: shake 0.4s ease-in-out;
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-6px); }
+        40% { transform: translateX(6px); }
+        60% { transform: translateX(-4px); }
+        80% { transform: translateX(4px); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen text-slate-50" style="font-family: 'Poppins', system-ui, -apple-system, sans-serif;">
+    <div id="root" class="max-w-4xl mx-auto px-4 py-10"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <script type="text/babel" data-presets="react">
+      const { useEffect, useMemo, useState } = React;
+      // Auto-detect API URL: use relative path on Replit, localhost for local dev
+      const API = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+        ? "http://localhost:8000" 
+        : "/api";
+
+      const priorityColors = {
+        chill: "bg-emerald-500/20 text-emerald-200",
+        normal: "bg-sky-500/20 text-sky-100",
+        focus: "bg-orange-500/25 text-orange-100",
+      };
+
+      const Badge = ({ text }) => (
+        <span className={`px-2 py-1 rounded-full text-xs uppercase tracking-wide ${priorityColors[text] || priorityColors.normal}`}>
+          {text}
+        </span>
+      );
+
+      const Progress = ({ value }) => (
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs uppercase tracking-wide text-slate-200">
+            <span>Progress</span>
+            <span>{value}%</span>
+          </div>
+          <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden">
+            <div
+              className="h-full transition-all"
+              style={{ width: value + "%", backgroundColor: "#FED7AA" }}
+            />
+          </div>
+        </div>
+      );
+
+      const Card = ({ children }) => (
+        <div className="glass rounded-xl p-5 glow border-white/10">{children}</div>
+      );
+
+      function AuthScreen({ users, onRegister, onConfirmEmail, onLogin, pendingEmail }) {
+        const [mode, setMode] = useState("login");
+        const [email, setEmail] = useState("");
+        const [password, setPassword] = useState("");
+        const [confirm, setConfirm] = useState("");
+        const [error, setError] = useState("");
+        const [shake, setShake] = useState(false);
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setError("");
+          setShake(false);
+          if (!email.trim() || !password.trim()) {
+            setError("Please fill all fields.");
+            setShake(true);
+            return;
+          }
+          if (mode === "register") {
+            if (password !== confirm) {
+              setError("Passwords must match.");
+              setShake(true);
+              return;
+            }
+            const cleanEmail = email.trim().toLowerCase();
+            try {
+              await fetch(API + "/send-confirmation", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: cleanEmail }),
+              });
+            } catch (err) {
+              // best-effort email; still allow registration
+            }
+            onRegister(cleanEmail, password);
+            return;
+          }
+          const ok = onLogin(email.trim().toLowerCase(), password);
+          if (!ok) {
+            setError("Wrong email or password. Sign up first, then login.");
+            setShake(true);
+          }
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <p className="text-slate-100 text-sm tracking-[0.22em] uppercase">Fluid AI — Gen AI Dev</p>
+              <h1 className="text-5xl md:text-6xl font-semibold text-white">Welcome Back</h1>
+              <p className="text-slate-100 text-base md:text-lg">Login or create an account to use your task board.</p>
+            </div>
+
+            <div className="grid md:grid-cols-1 gap-4">
+              <Card>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-semibold text-white">{mode === "login" ? "Sign In" : "Register"}</h2>
+                  <button
+                    className="text-sm text-slate-200 underline"
+                    onClick={() => {
+                      setMode(mode === "login" ? "register" : "login");
+                      setError("");
+                    }}
+                  >
+                    {mode === "login" ? "Create account" : "Have an account? Sign in"}
+                  </button>
+                </div>
+                <form className={`space-y-3 ${shake ? "animate-shake" : ""}`} onSubmit={handleSubmit}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    className={`w-full px-4 py-3 rounded-lg bg-white text-slate-900 border ${error ? "border-rose-400" : "border-slate-200"} focus:outline-none focus:ring-2 focus:ring-rose-400`}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    className={`w-full px-4 py-3 rounded-lg bg-white text-slate-900 border ${error ? "border-rose-400" : "border-slate-200"} focus:outline-none focus:ring-2 focus:ring-rose-400`}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  {mode === "register" && (
+                    <input
+                      type="password"
+                      placeholder="Confirm password"
+                      className={`w-full px-4 py-3 rounded-lg bg-white text-slate-900 border ${error ? "border-rose-400" : "border-slate-200"} focus:outline-none focus:ring-2 focus:ring-rose-400`}
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                    />
+                  )}
+                  {error && <p className="text-sm text-rose-200">{error}</p>}
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-rose-500 via-pink-500 to-indigo-500 hover:opacity-90 text-white px-4 py-3 rounded-lg font-semibold transition"
+                  >
+                    {mode === "login" ? "Sign In" : "Sign Up"}
+                  </button>
+                </form>
+
+                {mode === "register" && pendingEmail && (
+                  <div className="mt-4 p-3 rounded-lg bg-white/10 border border-white/20 text-slate-100">
+                    <p className="text-sm mb-2">We sent a confirmation link to <strong>{pendingEmail}</strong>.</p>
+                    <button
+                      className="w-full bg-white text-rose-600 font-semibold px-4 py-2 rounded-lg hover:bg-rose-50"
+                      onClick={() => onConfirmEmail(pendingEmail)}
+                    >
+                      Confirm email
+                    </button>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
+        );
+      }
+
+      function TaskBoard() {
+        const [tasks, setTasks] = useState([]);
+        const [title, setTitle] = useState("");
+        const [priority, setPriority] = useState("normal");
+        const [estimate, setEstimate] = useState("");
+        const [estimateUnit, setEstimateUnit] = useState("minutes");
+        const [loading, setLoading] = useState(false);
+        const [insights, setInsights] = useState({ progress: 0, streak_days: 0, suggestion: "" });
+
+        const fetchData = async () => {
+          const [taskRes, insightRes] = await Promise.all([
+            fetch(API + "/tasks"),
+            fetch(API + "/insights"),
+          ]);
+          const [taskData, insightData] = await Promise.all([taskRes.json(), insightRes.json()]);
+          setTasks(taskData);
+          setInsights(insightData);
+        };
+
+        useEffect(() => {
+          fetchData();
+        }, []);
+
+        const addTask = async (e) => {
+          e.preventDefault();
+          if (!title.trim()) return;
+          setLoading(true);
+          await fetch(API + "/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title,
+              priority,
+              estimate_value: estimate ? parseInt(estimate, 10) || null : null,
+              estimate_unit: estimateUnit || null,
+            }),
+          });
+          setTitle("");
+          setPriority("normal");
+          setEstimate("");
+          await fetchData();
+          setLoading(false);
+        };
+
+        const toggleTask = async (id, completed) => {
+          await fetch(API + "/tasks/" + id, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ completed }),
+          });
+          fetchData();
+        };
+
+        const deleteTask = async (id) => {
+          await fetch(API + "/tasks/" + id, { method: "DELETE" });
+          fetchData();
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <p className="text-pink-200 text-sm tracking-[0.22em] uppercase">Fluid AI — Gen AI Dev</p>
+              <h1 className="text-4xl md:text-5xl font-semibold text-white drop-shadow">Vibe Task Board</h1>
+              <p
+                className="text-base md:text-lg font-semibold"
+                style={{ color: "#FED7AA" }}
+              >
+                Calm, focused, and quick to use.
+              </p>
+            </div>
+
+            <Card>
+              <form onSubmit={addTask} className="grid gap-3 md:grid-cols-12 items-stretch">
+                <div className="md:col-span-6">
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Add a task to keep momentum..."
+                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/10 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  />
+                </div>
+                <div className="md:col-span-3 flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={estimate}
+                    onChange={(e) => setEstimate(e.target.value)}
+                    placeholder="Time"
+                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/10 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  />
+                  <select
+                    value={estimateUnit}
+                    onChange={(e) => setEstimateUnit(e.target.value)}
+                    className="w-28 px-2 py-3 rounded-lg bg-white/10 border border-white/10 focus:outline-none"
+                  >
+                    <option value="seconds">sec</option>
+                    <option value="minutes">min</option>
+                    <option value="hours">hrs</option>
+                    <option value="days">days</option>
+                    <option value="months">months</option>
+                    <option value="years">years</option>
+                  </select>
+                </div>
+                <div className="md:col-span-1">
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    className="w-full px-3 py-3 rounded-lg bg-white/10 border border-white/10 focus:outline-none"
+                  >
+                    <option value="chill">Chill</option>
+                    <option value="normal">Steady</option>
+                    <option value="focus">Laser Focus</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2 flex w-full md:px-0 justify-start">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-sky-500 hover:bg-sky-400 text-white px-4 py-3 rounded-lg font-semibold transition disabled:opacity-60 h-full"
+                  >
+                    {loading ? "Adding..." : "Add Task"}
+                  </button>
+                </div>
+              </form>
+            </Card>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs text-slate-300 uppercase tracking-wide">Flow Insight</p>
+                    <h2 className="text-2xl font-semibold text-white">Momentum Pulse</h2>
+                  </div>
+                  <Badge text={insights.streak_days >= 3 ? "focus" : "normal"} />
+                </div>
+                <Progress value={insights.progress || 0} />
+                <div className="mt-4 flex items-center justify-between text-sm text-slate-200">
+                  <span>Streak: <strong>{insights.streak_days}</strong> day(s)</span>
+                  <span>{insights.completed} / {insights.total} done</span>
+                </div>
+                <p className="mt-3 text-slate-100 italic">{insights.suggestion}</p>
+              </Card>
+
+              <Card>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-xs text-slate-300 uppercase tracking-wide">Mood</p>
+                    <h2 className="text-2xl font-semibold text-white">Serenity Mode</h2>
+                  </div>
+                  <span className="text-sky-200 text-xs">Soft gradients, focused flow</span>
+                </div>
+                <p className="text-slate-200 text-sm leading-relaxed">
+                  Unique touch: Focus-only filter + streak insights. Toggle Focus to see only high-priority items, and keep your streak alive for a subtle glow of accomplishment.
+                </p>
+              </Card>
+            </div>
+
+            <Card>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+                <h2 className="text-2xl font-semibold text-white">Tasks</h2>
+                <span className="text-slate-300 text-sm">Tap checkbox to complete</span>
+              </div>
+              <div className="mb-4">
+                <Progress value={insights.progress || 0} />
+              </div>
+              <div className="space-y-3">
+                {tasks.length === 0 && (
+                  <p className="text-slate-200 text-sm">Nothing here yet — add a task to start.</p>
+                )}
+                {tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-3 bg-white/5 px-4 py-3 rounded-lg border border-white/5 hover:border-sky-400/50 transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={task.completed}
+                      onChange={(e) => toggleTask(task.id, e.target.checked)}
+                      className="w-5 h-5 accent-sky-400"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <p className={`font-medium ${task.completed ? "line-through text-slate-400" : ""}`}>
+                        {task.title}
+                      </p>
+                      <div className="flex gap-2 items-center text-xs text-slate-300">
+                        <Badge text={task.priority} />
+                        {task.estimate_value != null && task.estimate_unit && (
+                          <span>~{task.estimate_value} {task.estimate_unit}</span>
+                        )}
+                        <span>{new Date(task.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-full bg-slate-900/30 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: task.completed ? "100%" : "8%", backgroundColor: "#FED7AA" }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-200">
+                          {task.completed ? "100%" : "0%"}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="text-sm text-rose-200 hover:text-rose-100"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      function App() {
+        // Simplified flow: always show the task board directly
+        return <TaskBoard />;
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
